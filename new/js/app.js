@@ -42,6 +42,9 @@ class StreamStudio {
       // Update UI state
       this.updateUI();
 
+      // Start periodic UI stats updates
+      this.ui.startStatsUpdate();
+
       console.log("StreamStudio initialized successfully");
     } catch (error) {
       console.error("Failed to initialize StreamStudio:", error);
@@ -87,6 +90,9 @@ class StreamStudio {
       .getElementById("settingsBtn")
       .addEventListener("click", () => this.showSettings());
     document
+      .getElementById("helpBtn")
+      .addEventListener("click", () => this.ui.showHelp());
+    document
       .getElementById("closeSettings")
       .addEventListener("click", () => this.hideSettings());
     document
@@ -124,12 +130,22 @@ class StreamStudio {
         this.switchSettingsTab(e.currentTarget.dataset.tab)
       );
     });
+
+    // Transcript controls
+    document
+      .getElementById("toggleTranscript")
+      .addEventListener("click", () => this.toggleTranscript());
+    document
+      .getElementById("exportTranscript")
+      .addEventListener("click", () => this.exportTranscript());
   }
 
   async startRecording() {
     try {
       if (!this.currentSource) {
-        this.showError("Please select a video source first");
+        // Prompt for source and auto-start when selected
+        this.startAfterSource = true;
+        this.showSourceModal();
         return;
       }
 
@@ -225,6 +241,13 @@ class StreamStudio {
       this.updateUI();
 
       console.log("Source selected:", sourceType);
+
+      // If user attempted to start recording before selecting a source,
+      // auto-start now that a source is available
+      if (this.startAfterSource) {
+        this.startAfterSource = false;
+        this.startRecording();
+      }
     } catch (error) {
       console.error("Failed to select source:", error);
       this.showError("Failed to select video source");
@@ -260,7 +283,14 @@ class StreamStudio {
   }
 
   showSourceModal() {
-    document.getElementById("sourcesModal").classList.add("active");
+    const modal = document.getElementById("sourcesModal");
+    console.log("showSourceModal called, modal element:", modal);
+    if (modal) {
+      modal.classList.add("active");
+      console.log("Modal classes after adding active:", modal.className);
+    } else {
+      console.error("sourcesModal element not found!");
+    }
   }
 
   hideSourceModal() {
@@ -324,8 +354,7 @@ class StreamStudio {
 
   updateUI() {
     // Update button states
-    document.getElementById("startRecording").disabled =
-      this.isRecording || !this.currentSource;
+    document.getElementById("startRecording").disabled = this.isRecording;
     document.getElementById("stopRecording").disabled = !this.isRecording;
     document.getElementById("startStream").disabled =
       this.isStreaming || !this.currentSource;
@@ -383,6 +412,20 @@ class StreamStudio {
   showSuccess(message) {
     // Simple success display - in a real app, you'd use a proper notification system
     alert(`Success: ${message}`);
+  }
+
+  toggleTranscript() {
+    const content = document.getElementById("transcriptContent");
+    const btn = document.getElementById("toggleTranscript");
+    if (!content || !btn) return;
+
+    const isHidden = content.style.display === "none";
+    content.style.display = isHidden ? "block" : "none";
+    btn.textContent = isHidden ? "Hide" : "Show";
+  }
+
+  exportTranscript() {
+    this.transcript.exportTranscript("txt");
   }
 }
 
