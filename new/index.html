@@ -25,6 +25,20 @@
       <div class="header-right">
         <button class="header-btn" id="settingsBtn" title="Settings">⚙️</button>
         <button class="header-btn" id="helpBtn" title="Help">❓</button>
+        <button class="header-btn" id="signInBtn" title="Sign in">
+          Sign in
+        </button>
+        <button class="header-btn" id="signUpBtn" title="Sign up">
+          Sign up
+        </button>
+        <button
+          class="header-btn"
+          id="logoutBtn"
+          title="Log out"
+          style="display: none"
+        >
+          Log out
+        </button>
       </div>
     </header>
 
@@ -379,6 +393,71 @@
               <p>Share browser tab</p>
             </div>
           </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- MOGAWAS IF MO CLICK KA NG SIGN IN O SIGN UP -->
+    <div class="modal" id="authModal">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h2>Sign in to continue</h2>
+          <button class="modal-close" id="authClose">&times;</button>
+        </div>
+        <div class="modal-body">
+          <div class="settings-tabs">
+            <button class="tab-btn active" data-tab="signin">Sign In</button>
+            <button class="tab-btn" data-tab="signup">Sign Up</button>
+          </div>
+          <div class="settings-content">
+            <div class="tab-content active" id="signinSettings">
+              <div class="setting-group">
+                <label>Email</label>
+                <input
+                  type="email"
+                  id="authEmail"
+                  placeholder="you@example.com"
+                />
+              </div>
+              <div class="setting-group">
+                <label>Password</label>
+                <input
+                  type="password"
+                  id="authPassword"
+                  placeholder="••••••••"
+                />
+              </div>
+            </div>
+            <div class="tab-content" id="signupSettings">
+              <div class="setting-group">
+                <label>Email</label>
+                <input
+                  type="email"
+                  id="signupEmail"
+                  placeholder="you@example.com"
+                />
+              </div>
+              <div class="setting-group">
+                <label>Password</label>
+                <input
+                  type="password"
+                  id="signupPassword"
+                  placeholder="Create a password"
+                />
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button class="btn secondary" id="authCancel">Cancel</button>
+          <button class="btn primary" id="authSignInSubmit">Continue</button>
+          <button
+            class="btn primary"
+            id="authSignUpSubmit"
+            style="display: none"
+          >
+            Create Account
+          </button>
         </div>
       </div>
     </div>

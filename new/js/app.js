@@ -23,6 +23,10 @@ class StreamStudio {
     this.isStreaming = false;
     this.currentSource = null;
 
+    // Auth state
+    this.auth = this.loadAuth();
+    this.postAuthAction = null;
+
     this.init();
   }
 
@@ -41,6 +45,7 @@ class StreamStudio {
 
       // Update UI state
       this.updateUI();
+      this.updateAuthNav();
 
       // Start periodic UI stats updates
       this.ui.startStatsUpdate();
@@ -99,6 +104,17 @@ class StreamStudio {
       .getElementById("saveSettings")
       .addEventListener("click", () => this.saveSettings());
 
+    // Auth nav buttons
+    document
+      .getElementById("signInBtn")
+      ?.addEventListener("click", () => this.showAuthModal("signin"));
+    document
+      .getElementById("signUpBtn")
+      ?.addEventListener("click", () => this.showAuthModal("signup"));
+    document
+      .getElementById("logoutBtn")
+      ?.addEventListener("click", () => this.logout());
+
     // AI controls
     document
       .getElementById("aiCommands")
@@ -124,8 +140,8 @@ class StreamStudio {
       );
     });
 
-    // Settings tabs
-    document.querySelectorAll(".tab-btn").forEach(btn => {
+    // Settings tabs (scoped to settings modal)
+    document.querySelectorAll("#settingsModal .tab-btn").forEach(btn => {
       btn.addEventListener("click", e =>
         this.switchSettingsTab(e.currentTarget.dataset.tab)
       );
@@ -138,10 +154,34 @@ class StreamStudio {
     document
       .getElementById("exportTranscript")
       .addEventListener("click", () => this.exportTranscript());
+
+    // Auth modal controls
+    document
+      .getElementById("authClose")
+      ?.addEventListener("click", () => this.hideAuthModal());
+    document
+      .getElementById("authCancel")
+      ?.addEventListener("click", () => this.hideAuthModal());
+    document
+      .getElementById("authSignInSubmit")
+      ?.addEventListener("click", () => this.handleAuthSignIn());
+    document
+      .getElementById("authSignUpSubmit")
+      ?.addEventListener("click", () => this.handleAuthSignUp());
+    // Auth tabs (scoped to auth modal)
+    document.querySelectorAll("#authModal .tab-btn").forEach(btn => {
+      btn.addEventListener("click", e =>
+        this.switchAuthTab(e.currentTarget.dataset.tab)
+      );
+    });
   }
 
   async startRecording() {
     try {
+      if (!this.isAuthenticated()) {
+        this.requireAuth(() => this.startRecording());
+        return;
+      }
       if (!this.currentSource) {
         // Prompt for source and auto-start when selected
         this.startAfterSource = true;
@@ -259,6 +299,13 @@ class StreamStudio {
     const message = input.value.trim();
 
     if (message) {
+      if (!this.isAuthenticated()) {
+        const pendingMessage = message;
+        this.requireAuth(() => {
+          this.chat.sendMessage(pendingMessage);
+        });
+        return;
+      }
       this.chat.sendMessage(message);
       input.value = "";
     }
@@ -266,6 +313,20 @@ class StreamStudio {
 
   toggleAICommands(event) {
     const enabled = event.target.checked;
+    if (enabled && !this.isAuthenticated()) {
+      // Revert toggle and prompt auth
+      event.target.checked = false;
+      this.requireAuth(() => {
+        const checkbox = document.getElementById("aiCommands");
+        if (checkbox) {
+          checkbox.checked = true;
+          this.ai.setEnabled(true);
+          const statusElement = document.getElementById("aiStatus");
+          if (statusElement) statusElement.textContent = "AI: Listening";
+        }
+      });
+      return;
+    }
     this.ai.setEnabled(enabled);
 
     const statusElement = document.getElementById("aiStatus");
@@ -426,6 +487,136 @@ class StreamStudio {
 
   exportTranscript() {
     this.transcript.exportTranscript("txt");
+  }
+
+  // --- Auth helpers ---
+  isAuthenticated() {
+    return !!this.auth?.email;
+  }
+
+  loadAuth() {
+    try {
+      const raw = localStorage.getItem("streamstudio-auth");
+      return raw ? JSON.parse(raw) : null;
+    } catch (e) {
+      return null;
+    }
+  }
+
+  saveAuth(auth) {
+    this.auth = auth;
+    try {
+      localStorage.setItem("streamstudio-auth", JSON.stringify(auth));
+    } catch (e) {}
+  }
+
+  clearAuth() {
+    this.auth = null;
+    localStorage.removeItem("streamstudio-auth");
+  }
+
+  requireAuth(actionCallback) {
+    this.postAuthAction = actionCallback;
+    this.showAuthModal("signin");
+  }
+
+  showAuthModal(defaultTab = "signin") {
+    const modal = document.getElementById("authModal");
+    if (modal) {
+      modal.classList.add("active");
+      this.switchAuthTab(defaultTab);
+    }
+  }
+
+  hideAuthModal() {
+    const modal = document.getElementById("authModal");
+    if (modal) modal.classList.remove("active");
+  }
+
+  switchAuthTab(tabName) {
+    // Toggle buttons active state (scoped to auth modal)
+    document
+      .querySelectorAll("#authModal .tab-btn")
+      .forEach(btn => btn.classList.remove("active"));
+    const tabBtn = document.querySelector(
+      `#authModal .tab-btn[data-tab="${tabName}"]`
+    );
+    if (tabBtn) tabBtn.classList.add("active");
+
+    // Toggle content
+    document
+      .querySelectorAll("#authModal .tab-content")
+      .forEach(content => content.classList.remove("active"));
+    const content = document.getElementById(`${tabName}Settings`);
+    if (content) content.classList.add("active");
+
+    // Toggle footer buttons
+    const signInBtn = document.getElementById("authSignInSubmit");
+    const signUpBtn = document.getElementById("authSignUpSubmit");
+    if (signInBtn && signUpBtn) {
+      if (tabName === "signin") {
+        signInBtn.style.display = "inline-block";
+        signUpBtn.style.display = "none";
+      } else {
+        signInBtn.style.display = "none";
+        signUpBtn.style.display = "inline-block";
+      }
+    }
+  }
+
+  handleAuthSignIn() {
+    const email = document.getElementById("authEmail")?.value?.trim();
+    const password = document.getElementById("authPassword")?.value;
+    if (!email || !password) {
+      this.showError("Please enter email and password");
+      return;
+    }
+    // Simple demo auth
+    this.saveAuth({ email });
+    this.hideAuthModal();
+    this.resumePostAuthAction();
+    this.ui.showNotification("Signed in", "success");
+    this.updateAuthNav();
+  }
+
+  handleAuthSignUp() {
+    const email = document.getElementById("signupEmail")?.value?.trim();
+    const password = document.getElementById("signupPassword")?.value;
+    if (!email || !password) {
+      this.showError("Please enter email and password");
+      return;
+    }
+    // Simple demo signup -> sign in
+    this.saveAuth({ email });
+    this.hideAuthModal();
+    this.resumePostAuthAction();
+    this.ui.showNotification("Account created & signed in", "success");
+    this.updateAuthNav();
+  }
+
+  resumePostAuthAction() {
+    if (typeof this.postAuthAction === "function") {
+      const action = this.postAuthAction;
+      this.postAuthAction = null;
+      action();
+    }
+  }
+
+  logout() {
+    this.clearAuth();
+    this.updateAuthNav();
+    this.ui.showNotification("Logged out", "info");
+  }
+
+  updateAuthNav() {
+    const signInBtn = document.getElementById("signInBtn");
+    const signUpBtn = document.getElementById("signUpBtn");
+    const logoutBtn = document.getElementById("logoutBtn");
+
+    const isAuthed = this.isAuthenticated();
+    if (signInBtn) signInBtn.style.display = isAuthed ? "none" : "inline-block";
+    if (signUpBtn) signUpBtn.style.display = isAuthed ? "none" : "inline-block";
+    if (logoutBtn) logoutBtn.style.display = isAuthed ? "inline-block" : "none";
   }
 }
 
